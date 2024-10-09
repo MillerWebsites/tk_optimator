@@ -1,0 +1,7 @@
+{
+    "git.ignoreLimitWarning": true,
+    "CodeGPT.Autocomplete.provider": "Ollama - codestral:latest",
+    "CodeGPT.Autocomplete.enabled": true,
+    "CodeGPT.Autocomplete.maxTokens": 160,
+    "CodeGPT.apiKey": "Ollama"
+}
