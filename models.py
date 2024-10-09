@@ -10,6 +10,10 @@ from search_manager import SearchManager
 
 logger = logging.getLogger(__name__)
 
+def log_and_raise_error(message: str, exception: Exception):
+    logger.error(message)
+    raise exception
+
 class ModelFactory:
     @staticmethod
     @lru_cache(maxsize=None)
@@ -27,8 +31,7 @@ class ModelFactory:
                 safety_settings=SAFETY_SETTINGS,
             )
         except Exception as e:
-            logger.error(f"Error initializing model: {e}")
-            raise
+            log_and_raise_error(f"Error initializing model: {e}", e)
 
     @classmethod
     def create_model(cls, instruction: str, **config: Any) -> genai.GenerativeModel:
@@ -44,10 +47,10 @@ class ModelManager:
             """
             *** WRITER'S HANDBOOK: MASTER SYSTEM INSTRUCTIONS ***
             These are the guidelines and instructions that guide your writing.
-                        
+
             I. ROLE & CONTEXT:
             You are a dynamic, innovative, and linguistically skilled content creator that identifies and switches modes between creative or informational tasks seamlessly, adapting to various roles and specialties as provided/required. Your primary objective is to produce exceptional writing outputs that precisely aligns with the user's requirements and the specified goal.  
-            
+
             II. RESPONSIBILITIES AND REQUIREMENTS:
             1. Analyze the user's request and adapt your writing style, tone, and expertise accordingly.
             2. Synthesize complex information from various sources to create insightful, value-added content.
@@ -58,7 +61,7 @@ class ModelManager:
             6. Adaptively switch between different roles, writing styles, tones, and subject matter expertise based on the context.
             7. Adhere to guidelines, directions and any brand voices as provided by the user and/or director.
             8. Ensure the final output meets or exceeds the user's expectations and project requirements.
-            
+
             III. GOALS AND GUIDELINES:
             Unless directed otherwise, your ultimate goal is to generate and develop content to be optimally:
             1. Comprehensive: Deliver thorough, well-researched content that covers all relevant aspects of the topic.
@@ -67,7 +70,7 @@ class ModelManager:
             4. Creative: Generate original ideas and unique perspectives while maintaining accuracy.
             Content Enhancement:
             5. Contributional: Identify opportunities to expand upon or challenge conventional ideas within the subject matter and contribute novel insights, introduce a fresh perspective, and/or build upon existing information/understanding to further the global discourse or advance a field of study.
-    
+
             By fulfilling these responsibilities, you will consistently deliver high-quality, tailored content that meets the diverse needs of users across various domains and writing tasks.""",    
             {"temperature": 0.8, "top_p": 0.9, "top_k": 50, "max_output_tokens": 32000},
         ),
@@ -89,6 +92,11 @@ class ModelManager:
         ),
     }
 
+    MODEL_NAMES = {
+        "writer": "models/gemini-1.5-pro-latest",
+        "default": "models/gemini-1.5-flash-latest"
+    }
+
     def __init__(self, search_enabled: bool = True):
         self.search_enabled = search_enabled
 
@@ -100,7 +108,7 @@ class ModelManager:
         if model_type in {"writer", "researcher"} and self.search_enabled:
             instruction += self.get_search_instructions()
 
-        model_name = "models/gemini-1.5-pro-latest" if model_type == "writer" else "models/gemini-1.5-flash-latest"
+        model_name = self.MODEL_NAMES.get(model_type, self.MODEL_NAMES["default"])
         return ModelFactory.create_model(instruction, model_name=model_name, **config)
 
     @staticmethod
@@ -133,7 +141,7 @@ class ModelManager:
                 chat_log.append(f"{model_type.capitalize()}: {response_text}")
                 search_output = self.perform_search(chat_log, context, search_queries, search_manager)
 
-                updated_prompt = f"{full_prompt}\n\nAdditional Information from Search Results:\n{search_output}"
+                updated_prompt = f"{user_prompt}\n\nAdditional Information from Search Results:\n{search_output}"
                 updated_response = model.generate_content(updated_prompt)
                 response_text = updated_response.text if updated_response.text else ""
 
@@ -149,9 +157,7 @@ class ModelManager:
         if len(parts) > 1:
             search_queries = [query.strip() for query in parts[1].split("|") if query.strip()]
             main_response = parts[0].strip()
-            if len(search_queries) > 2:
-                search_queries = search_queries[:2]
-            return main_response, search_queries
+            return main_response, search_queries[:2]
         return response_text, []
 
     def perform_search(
@@ -177,4 +183,4 @@ class ModelManager:
         return research_response.text if research_response.text else "No research findings."
 
 def generate_convo_context(prompt: str, chat_log: List[str]) -> str:
-        return f"\nLatest Progress: {'\n'.join(chat_log[-10:])}\nTarget final output and/or instruction from the user: {prompt}"
+    return f"\nLatest Progress: {'\n'.join(chat_log[-10:])}\nTarget final output and/or instruction from the user: {prompt}"

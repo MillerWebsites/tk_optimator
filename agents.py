@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class AgentManager:
+class Agent:
     def __init__(self, file_path: str = "agents.json"):
         self.file_path = file_path
         self.agents = self.load_agents()

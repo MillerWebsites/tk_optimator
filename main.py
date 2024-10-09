@@ -4,7 +4,7 @@ from tkinter import ttk, scrolledtext, Menu, filedialog, simpledialog, messagebo
 
 from config import GEMINI_API_KEY, MAX_SEARCH_RESULTS
 from models import ModelManager
-from agents import AgentManager
+from agents import Agents
 import search_manager
 from search_manager import SearchManager, SearchProvider, SearchAPI, DuckDuckGoSearchProvider, SearchProvider
 from gui import App
