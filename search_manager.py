@@ -418,7 +418,7 @@ def initialize_search_manager():
 if __name__ == "__main__":
     search_manager = initialize_search_manager()
     query = "specific ideation templates and frameworks"
-    num_results = 10
+    num_results = 15
 
     if search_manager:
         results = search_manager.search(query, num_results)

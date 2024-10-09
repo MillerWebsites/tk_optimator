@@ -1,10 +1,3 @@
-/*************  ✨ Codeium Command 🌟  *************/
-"""
-Search Manager
-"""
-
-import logging
-import os
 import requests
 from bs4 import BeautifulSoup, Comment
 import time
@@ -29,16 +22,12 @@ import gzip
 load_dotenv()
 
 # Google API keys
-GOOGLE_CUSTOM_SEARCH_ID = os.getenv('GOOGLE_CUSTOM_SEARCH_ID')
-GOOGLE_CUSTOM_SEARCH_API_KEY = os.getenv('GOOGLE_CUSTOM_SEARCH_API_KEY')
-BRAVE_SEARCH_API_KEY = os.getenv('BRAVE_SEARCH_API_KEY')
 GOOGLE_CUSTOM_SEARCH_ID="32e9bbeb5cbee467a"
 GOOGLE_CUSTOM_SEARCH_API_KEY="AIzaSyA4rykIBGRoFTPjYAWoABlEyVs51K2geMo"
 BRAVE_SEARCH_API_KEY = os.getenv('BRAVE_SEARCH_API_KEY')  # Brave Search API key (if available)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)  # Get a logger instance
 
 # --- [Improved] More descriptive error handling ---
@@ -51,7 +40,6 @@ def initialize_apis() -> List['SearchAPI']:
     Raises:
         ValueError: If a required environment variable for an API is not set. 
     """
-    if not GOOGLE_CUSTOM_SEARCH_API_KEY or not GOOGLE_CUSTOM_SEARCH_ID:
     if GOOGLE_CUSTOM_SEARCH_API_KEY is None or GOOGLE_CUSTOM_SEARCH_ID is None:
         raise ValueError("GOOGLE_CUSTOM_SEARCH_API_KEY and GOOGLE_CUSTOM_SEARCH_ID must be set in .env.")
     apis = [
@@ -131,7 +119,6 @@ class SearchAPI(SearchProvider):
         self.name = name
         self.api_key = api_key
         self.base_url = base_url
-        self.params = params
         self.params = params.copy()  # Create a copy to avoid modifying the original
         if api_key:
             self.params['key'] = api_key
@@ -156,15 +143,11 @@ class SearchAPI(SearchProvider):
         """Performs a search using the API."""
         self.respect_rate_limit()
         logger.info(f"Searching {self.name} for: {query}")
-        params = self.params.copy() 
+        params = self.params.copy()
         params['q'] = query
-        
-        # Google Custom Search has a max of 10 results per request
-        if self.name == 'Google':
-            params['num'] = min(num_results, 10) 
-        else:
-            params['num'] = num_results
 
+        # Google Custom Search has a max of 10 results per request
+        params['num'] = min(num_results, 10) if self.name == 'Google' else num_results
         headers = {'User-Agent': self.user_agent_rotator.random}
         try:
             response = requests.get(self.base_url, params=params, headers=headers, timeout=10)
@@ -226,7 +209,6 @@ class WebContentExtractor:
     _driver = None
 
     @classmethod
-    def extract_content(cls, url: str) -> str:
     def _initialize_driver(cls):
         """Initializes the Selenium WebDriver if it hasn't been created yet."""
         if cls._driver is None:
@@ -275,16 +257,13 @@ class WebContentExtractor:
         Returns:
             str: The extracted content, or an empty string if extraction fails. 
         """
-        if not cls.is_valid_url(url):
         if not WebContentExtractor.is_valid_url(url):
             logger.error(f"Invalid URL: {url}")
             return ""
 
-        for attempt in range(1, cls.MAX_RETRIES + 1):
         for attempt in range(1, WebContentExtractor.MAX_RETRIES + 1):
             try:
                 headers = {
-                    'User-Agent': random.choice(cls.USER_AGENTS),
                     'User-Agent': random.choice(WebContentExtractor.USER_AGENTS),
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.9',
@@ -294,7 +273,6 @@ class WebContentExtractor:
                     'Cache-Control': 'max-age=0',
                     'DNT': '1',
                 }
-                response = requests.get(url, headers=headers, timeout=cls.TIMEOUT)
                 response = requests.get(url, headers=headers, timeout=WebContentExtractor.TIMEOUT)
                 response.raise_for_status()
                 content_type = response.headers.get('Content-Type', '').lower()
@@ -499,5 +477,3 @@ if __name__ == "__main__":
             print("---")
     else:
         print("Search functionality is disabled.")
-
-/******  abfaee7a-5673-44d7-9b95-d0e7b2603837  *******/

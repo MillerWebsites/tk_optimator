@@ -1,0 +1,16 @@
+{
+    "pullRequestConfig": {
+        "provider": "github",
+        "hostRootUrl": "https://github.com",
+        "sourceRemote": "origin",
+        "sourceOwner": "MillerWebsites",
+        "sourceRepo": "tk_optimator",
+        "destRemote": "origin",
+        "destOwner": "MillerWebsites",
+        "destRepo": "tk_optimator",
+        "destProjectId": "",
+        "destBranch": "main",
+        "custom": null
+    },
+    "exportedAt": 1728195370563
+}
