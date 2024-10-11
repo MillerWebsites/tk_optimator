@@ -1,121 +1,121 @@
-#import requests
-#from bs4 import BeautifulSoup
-#import re
-#import gzip
-#import io
-#from selenium import webdriver
-#from selenium.webdriver.edge.options import Options
-#from selenium.webdriver.edge.service import Service
-#from webdriver_manager.microsoft import EdgeChromiumDriverManager
-#
-#def extract_text_from_html(url, extract_outside_main=False, extract_comments=False):
-#    # Request with headers
-#    headers = {
-#        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-#        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-#        'Accept-Language': 'en-US,en;q=0.9',
-#        'Accept-Encoding': 'gzip, deflate, br',
-#        'Connection': 'keep-alive',
-#        'Upgrade-Insecure-Requests': '1',
-#        'Cache-Control': 'max-age=0',
-#        'DNT': '1',
-#    }
-#    response = requests.get(url, headers=headers)
-#
-#    content_type = response.headers.get('Content-Type', '')
-#    if 'text/html' not in content_type:
-#        raise ValueError(f"Expected HTML, but received {content_type}")
-#
-#    # Handle gzip or plain text
-#    if response.headers.get('Content-Encoding') == 'gzip':
-#        try:
-#            html_content = gzip.decompress(response.content).decode('utf-8')
-#        except (gzip.BadGzipFile, OSError):
-#            html_content = response.text
-#    else:
-#        html_content = response.text
-#
-#    soup = BeautifulSoup(html_content, 'html.parser')
-#    main_content = soup.find(['div', 'main', 'article'], class_=re.compile(r'(main|content)', re.I)) or soup.body
-#    main_text = main_content.get_text(separator=' ', strip=True) if main_content else ''
-#
-#    # Fall back to Selenium if main_text is invalid
-#    if len(main_text) < 200 and ('cookies' in main_text.lower() or 'javascript' in main_text.lower() or len(main_text) < 10):
-#        main_text = extract_with_selenium(url)
-#
-#    # Optionally extract outside text and comments
-#    outside_text = extract_outside_main_content(soup, main_content) if extract_outside_main else ''
-#    comments = extract_comments_section(soup) if extract_comments else ''
-#
-#    # Combine extracted content
-#    return clean_text(f"{main_text} {outside_text} {comments}".strip())
-#
-#def extract_outside_main_content(soup, main_content):
-#    outside_tags = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4'])
-#    return ' '.join(tag.get_text(strip=True) for tag in outside_tags if tag not in main_content.descendants)
-#
-#def extract_comments_section(soup):
-#    comment_section = soup.find('div', class_='comments')
-#    return comment_section.get_text(separator=' ', strip=True) if comment_section else ''
-#
-#def extract_with_selenium(url):
-#    # Set up Edge options for headless browsing with human-like behavior
-#    edge_options = Options()
-#    edge_options.add_argument("--headless")
-#    edge_options.add_argument("--disable-gpu")
-#    edge_options.add_argument("--no-sandbox")
-#
-#    # Human-like headers and user-agent simulation
-#    edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-#    edge_options.add_argument("accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
-#    edge_options.add_argument("accept-language=en-US,en;q=0.9")
-#    edge_options.add_argument("accept-encoding=gzip, deflate, br")
-#
-#    # Set up the WebDriver for Edge
-#    service = Service(EdgeChromiumDriverManager().install())
-#    driver = webdriver.Edge(service=service, options=edge_options)
-#
-#    # Load the page with Selenium
-#    driver.get(url)
-#
-#    # Wait for JavaScript to execute
-#    driver.implicitly_wait(10)
-#
-#    # Get the page source after JavaScript execution
-#    html_content = driver.page_source
-#
-#    # Close the browser
-#    driver.quit()
-#
-#    # Parse the HTML content with BeautifulSoup
-#    soup = BeautifulSoup(html_content, 'html.parser')
-#
-#    # Extract main content
-#    main_content = soup.find(['div', 'main', 'article'], class_=re.compile(r'(main|content)', re.I)) or soup.body
-#    return main_content.get_text(separator=' ', strip=True) if main_content else ''
-#
-#
-#def clean_text(text):
-#    # Remove HTML tags
-#    text = re.sub(r'<[^>]+>', '', text)
-#
-#    # Remove duplicate/multiple adjacent new lines and white space characters
-#    text = re.sub(r'\s+', ' ', text)
-#
-#    # Remove any symbols other than punctuation and dollar signs
-#    text = re.sub(r'[^\w\s.,$]', '', text)
-#
-#    return text.strip()
-#
-#
-## Example usage
-#url = 'https://www.theatlantic.com/education/archive/2015/10/complex-academic-writing/412255/'
-#extracted_text = extract_text_from_html(url, extract_outside_main=False, extract_comments=False)
-#print(extracted_text)
-#
-#with open('extracted_text.txt', 'w', encoding='utf-8') as f:
-#    f.write(extracted_text)
-#
+import requests
+from bs4 import BeautifulSoup
+import re
+import gzip
+import io
+from selenium import webdriver
+from selenium.webdriver.edge.options import Options
+from selenium.webdriver.edge.service import Service
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
+
+def extract_text_from_html(url, extract_outside_main=False, extract_comments=False):
+    # Request with headers
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
+    }
+    response = requests.get(url, headers=headers)
+
+    content_type = response.headers.get('Content-Type', '')
+    if 'text/html' not in content_type:
+        raise ValueError(f"Expected HTML, but received {content_type}")
+
+    # Handle gzip or plain text
+    if response.headers.get('Content-Encoding') == 'gzip':
+        try:
+            html_content = gzip.decompress(response.content).decode('utf-8')
+        except (gzip.BadGzipFile, OSError):
+            html_content = response.text
+    else:
+        html_content = response.text
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    main_content = soup.find(['div', 'main', 'article'], class_=re.compile(r'(main|content)', re.I)) or soup.body
+    main_text = main_content.get_text(separator=' ', strip=True) if main_content else ''
+
+    # Fall back to Selenium if main_text is invalid
+    if len(main_text) < 200 and ('cookies' in main_text.lower() or 'javascript' in main_text.lower() or len(main_text) < 10):
+        main_text = extract_with_selenium(url)
+
+    # Optionally extract outside text and comments
+    outside_text = extract_outside_main_content(soup, main_content) if extract_outside_main else ''
+    comments = extract_comments_section(soup) if extract_comments else ''
+
+    # Combine extracted content
+    return clean_text(f"{main_text} {outside_text} {comments}".strip())
+
+def extract_outside_main_content(soup, main_content):
+    outside_tags = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4'])
+    return ' '.join(tag.get_text(strip=True) for tag in outside_tags if tag not in main_content.descendants)
+
+def extract_comments_section(soup):
+    comment_section = soup.find('div', class_='comments')
+    return comment_section.get_text(separator=' ', strip=True) if comment_section else ''
+
+def extract_with_selenium(url):
+    # Set up Edge options for headless browsing with human-like behavior
+    edge_options = Options()
+    edge_options.add_argument("--headless")
+    edge_options.add_argument("--disable-gpu")
+    edge_options.add_argument("--no-sandbox")
+
+    # Human-like headers and user-agent simulation
+    edge_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+    edge_options.add_argument("accept=text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
+    edge_options.add_argument("accept-language=en-US,en;q=0.9")
+    edge_options.add_argument("accept-encoding=gzip, deflate, br")
+
+    # Set up the WebDriver for Edge
+    service = Service(EdgeChromiumDriverManager().install())
+    driver = webdriver.Edge(service=service, options=edge_options)
+
+    # Load the page with Selenium
+    driver.get(url)
+
+    # Wait for JavaScript to execute
+    driver.implicitly_wait(10)
+
+    # Get the page source after JavaScript execution
+    html_content = driver.page_source
+
+    # Close the browser
+    driver.quit()
+
+    # Parse the HTML content with BeautifulSoup
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Extract main content
+    main_content = soup.find(['div', 'main', 'article'], class_=re.compile(r'(main|content)', re.I)) or soup.body
+    return main_content.get_text(separator=' ', strip=True) if main_content else ''
+
+
+def clean_text(text):
+    # Remove HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+
+    # Remove duplicate/multiple adjacent new lines and white space characters
+    text = re.sub(r'\s+', ' ', text)
+
+    # Remove any symbols other than punctuation and dollar signs
+    text = re.sub(r'[^\w\s.,$]', '', text)
+
+    return text.strip()
+
+
+# Example usage
+url = 'https://www.theatlantic.com/education/archive/2015/10/complex-academic-writing/412255/'
+extracted_text = extract_text_from_html(url, extract_outside_main=False, extract_comments=False)
+print(extracted_text)
+
+with open('extracted_text.txt', 'w', encoding='utf-8') as f:
+    f.write(extracted_text)
+
 
 
 import random

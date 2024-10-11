@@ -1,3 +1,4 @@
+from certifi import contents
 import requests
 from bs4 import BeautifulSoup, Comment
 import time
@@ -459,6 +460,32 @@ def initialize_search_manager():
         apis = search_settings['apis'] 
         return SearchManager(apis, web_search_provider=DuckDuckGoSearchProvider())
     return None
+
+
+# Example tool function (from your description)
+def foia_search(query):
+    url = f"https://search.foia.gov/search?utf8=%E2%9C%93&m=true&affiliate=foia.gov&query={query.replace(' ', '+')}"
+    headers = {
+        'User-Agent': random.choice(WebContentExtractor.USER_AGENTS),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
+    }
+    response = requests.get(url, headers=headers, timeout=WebContentExtractor.TIMEOUT)
+    response.raise_for_status()
+    html_content = response.content
+    # Process the HTML content as needed, extract links from HTML content into iterable list
+    soup = BeautifulSoup(html_content, 'html.parser')
+    links = [link.get('href') for link in soup.find_all('a')]
+    content = []
+    for link in links:
+        contents = WebContentExtractor.extract_content(link)
+        content.append(contents)
+    return content
 
 
 # Example usage
