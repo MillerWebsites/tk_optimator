@@ -487,10 +487,19 @@ def initialize_search_manager():
 
 
 # Example tool function (from your description)
-def foia_search(query):
+def foia_search(query: str) -> List[str]:
+    """Searches FOIA.gov for the given query and returns a list of relevant content.
+
+    Args:
+        query (str): The search query.
+
+    Returns:
+        List[str]: A list of text content extracted from relevant FOIA.gov search results.
+    """
     url = f"https://search.foia.gov/search?utf8=%E2%9C%93&m=true&affiliate=foia.gov&query={query.replace(' ', '+')}"
+    web_content_extractor = WebContentExtractor()
     headers = {
-        'User-Agent': random.choice(WebContentExtractor.USER_AGENTS),
+        'User-Agent': random.choice(web_content_extractor.USER_AGENTS),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
@@ -499,17 +508,29 @@ def foia_search(query):
         'Cache-Control': 'max-age=0',
         'DNT': '1',
     }
-    response = requests.get(url, headers=headers, timeout=WebContentExtractor.TIMEOUT)
-    response.raise_for_status()
-    html_content = response.content
-    # Process the HTML content as needed, extract links from HTML content into iterable list
-    soup = BeautifulSoup(html_content, 'html.parser')
-    links = [link.get('href') for link in soup.find_all('a')]
-    content = []
-    for link in links:
-        contents = WebContentExtractor.extract_content(link)
-        content.append(contents)
-    return content
+    try:
+        response = requests.get(url, headers=headers, timeout=web_content_extractor.TIMEOUT)
+        response.raise_for_status()
+        html_content = response.content.decode('utf-8')
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Extract links to actual FOIA results (not navigation links)
+        result_links = [a['href'] for a in soup.select('.result-title a') if a.has_attr('href')]
+
+        content = []
+        for link in result_links:
+            try:
+                if extracted_content := WebContentExtractor.extract_content(
+                    link
+                ):
+                    content.append(extracted_content)
+            except Exception as e:
+                logger.error(f"Error extracting content from {link}: {e}")
+
+        return content
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error searching FOIA.gov: {e}")
+        return []
 
 
 # Example usage

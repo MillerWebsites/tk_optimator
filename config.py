@@ -20,8 +20,8 @@ BACKOFF_FACTOR = 2
 MAX_TRUNCATE_LENGTH = 5000  # Length of truncated chat_log items
 MAX_INVALID_ATTEMPTS = 3
 MAX_SEARCH_RESULTS = 8
-MAX_CONTENT_LENGTH = 4000  # Maximum number of characters to extract from each webpage
-TIMEOUT = 15
+MAX_CONTENT_LENGTH = 15000  # Maximum number of characters to extract from each webpage
+TIMEOUT = 5
 MAX_SEARCH_QUERIES_PER_REQUEST = 2
 
 # Safety Settings
@@ -31,3 +31,10 @@ SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
+
+# LLM Model Configuration
+LLM_PROVIDER = "gemini"  # Default provider -  You can change this to "openai" if needed
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+GEMINI_PRO_MODEL = "models/gemini-1.5-pro-latest"
+GEMINI_FLASH_MODEL = "models/gemini-1.5-flash-latest" 
+# Add settings for other providers as needed

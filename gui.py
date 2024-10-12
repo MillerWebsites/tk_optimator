@@ -3,13 +3,17 @@ from tkinter import ttk, scrolledtext, Menu, filedialog, simpledialog, messagebo
 import logging
 from typing import List, Optional, Tuple, Dict
 from functools import partial
-
+import re
+import tools
 from models import ModelManager, ModelFactory, generate_convo_context
-from agents import AgentManager
+from agents import AgentManager, ToolManager, run_agent_interaction
 from search_manager import SearchManager, SearchAPI, DuckDuckGoSearchProvider
 from config import MAX_SEARCH_RESULTS
 import json
+from functools import partial
+
 logger = logging.getLogger(__name__)
+
 
 class ModifierTreeView(ttk.Treeview):
     def __init__(self, master, **kwargs):
@@ -23,6 +27,7 @@ class ModifierTreeView(ttk.Treeview):
             item_text = self.item(item, "text")
             if item_values := self.item(item, "values"):
                 self.selected_modifiers.append((item_text, item_values[0]))
+
 
 class App(tk.Tk):
     modifier_groups: Dict[str, Dict[str, str]] = {
@@ -57,20 +62,39 @@ class App(tk.Tk):
         }
     }
 
-    def __init__(self, search_manager: SearchManager, *args, **kwargs):
+    def __init__(
+        self,
+        search_manager: SearchManager,
+        tool_manager: ToolManager,
+        model_manager: ModelManager,
+        agent_manager: AgentManager,
+        llm_provider,
+        researcher_agent,  # Receive the researcher_agent
+        writer_agent,      # Receive the writer_agent
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.title("Creative AI writer")
         self.geometry("800x600")
 
-        self.model_manager = ModelManager(search_enabled=True)
-        self.agent_manager = AgentManager()
-        self.search_manager = search_manager 
+        self.search_manager = search_manager
+        self.tool_manager = tool_manager
+        self.model_manager = model_manager
+        self.agent_manager = agent_manager
+        self.llm_provider = llm_provider
+        self.researcher_agent = researcher_agent
+        self.writer_agent = writer_agent
 
         self.chat_log: List[str] = []
         self.context = ""
         self.current_prompt = ""
         self.last_output = ""
+
+        # Register tools from the tools module
+        self.tool_manager.register_tool("foia_search", tools.foia_search)
+        self.tool_manager.register_tool("search", partial(tools.web_search, self.search_manager))  # Use partial to pass search_manager
 
         self.setup_ui()
 
@@ -126,8 +150,36 @@ class App(tk.Tk):
         self.edit_menu.add_command(label="Paste", command=self.paste)
 
     def run_workflow(self, event):
-        # Implementation of the workflow
-        pass
+            user_input = self.user_prompt.get()
+            self.user_prompt.delete(0, tk.END)
+
+            if match := re.match(r"(\w+)\((.*)\)", user_input):
+                tool_name = match[1]
+                arguments = [arg.strip() for arg in match[2].split(",")]
+                try:
+                    result = self.tool_manager.execute_tool(tool_name, *arguments)
+                    message = f"Tool '{tool_name}' Result: {result}\n"
+                except Exception as e:
+                    message = f"Error: {e}\n"
+                    print(f"Error: {e}")  
+            else:
+                # ... regular LLM interaction
+                full_prompt = self.generate_prompt(user_input)
+                response = self.llm_provider.generate_response(full_prompt)
+                message = f"AI: {response}\n"
+
+            # Display the message (tool result or AI response)
+            self.chat_history.config(state="normal")
+            self.chat_history.insert(tk.END, message)
+            self.chat_history.config(state="disabled")
+            self.update()
+
+    def generate_prompt(self, user_input):
+        return f"""Previous conversation:
+{self.chat_history.get("1.0", tk.END)}
+
+User: {user_input}
+AI:"""
 
     def open_file(self):
         # Implementation of open file
