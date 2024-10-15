@@ -99,16 +99,6 @@
                 "top_k": 40,
                 "max_output_tokens": 16000
             }
-        },
-        "default_assistant": {
-            "agent_name": "Default Assistant",
-            "system_prompt": "You are the coordinator. Based on the conversation's context / message history, please choose the next agent that should provide their input from the list below, or, make a new one by following the system_prompt after the list of existing models.",
-            "generation_config": {
-                "temperature": 0.5,
-                "top_p": 0.7,
-                "top_k": 40,
-                "max_output_tokens": 16000
-            }
         }
 
     }

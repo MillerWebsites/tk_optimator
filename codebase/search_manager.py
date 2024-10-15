@@ -16,7 +16,11 @@ import random
 from selenium import webdriver
 from selenium.webdriver.edge.options import Options
 from selenium.webdriver.edge.service import Service
+from selenium_stealth import stealth
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import gzip
 #$end
 from newspaper import Article
@@ -33,16 +37,6 @@ def fetch_article_text(url):
     
     return title, author, pub_date, article_text
 
-if __name__ == '__main__':
-    url = 'https://github.com/kyegomez/ScreenAI/blob/main/README.md'
-    title, author, pub_date, article_text = fetch_article_text(url)
-    
-    print(f"Title: {title}\n")
-    print(f"Author: {author}\n")
-    print(f"Published Date: {pub_date}\n")
-    print(f"Article Text: {article_text}\n") 
-
-    
 # Load environment variables
 load_dotenv()
 
@@ -231,22 +225,44 @@ class WebContentExtractor:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36 OPR/78.0.4093.147',
     ]
         # Class variable to hold the WebDriver instance
-    _driver = None
+    _driver = None 
+
+    @classmethod
+    def get_driver(cls):
+        """Returns the shared WebDriver instance."""
+        if cls._driver is None:
+            cls._initialize_driver()
+        return cls._driver
 
     @classmethod
     def _initialize_driver(cls):
-        """Initializes the Selenium WebDriver if it hasn't been created yet."""
-        if cls._driver is None:
-            edge_options = Options()
-            edge_options.add_argument("--headless=new")
-            edge_options.add_argument("--disable-gpu")
-            edge_options.add_argument("--no-sandbox")
-            user_agent = random.choice(cls.USER_AGENTS)
-            edge_options.add_argument(f"user-agent={user_agent}")
+        """Initializes the Selenium WebDriver with anti-detection measures."""
+        edge_options = Options()
+        edge_options.add_argument("--headless=new")
+        edge_options.add_argument("--disable-gpu")
+        edge_options.add_argument("--no-sandbox")
 
-            # Set up the WebDriver for Edge
-            cls._driver = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()), options=edge_options)
+        user_agent = random.choice(cls.USER_AGENTS)
+        edge_options.add_argument(f"user-agent={user_agent}")
 
+        cls._driver = webdriver.Edge(service=Service(EdgeChromiumDriverManager().install()), options=edge_options)
+
+        stealth(cls._driver,
+                languages=["en-US", "en"],
+                vendor="Google Inc.",
+                platform="Win32",
+                webgl_vendor="Intel Inc.",
+                renderer="Angle",
+                fix_hairline=True, 
+        )
+
+    @classmethod
+    def quit_driver(cls):
+        """Quits the WebDriver."""
+        if cls._driver is not None:
+            cls._driver.quit()
+            cls._driver = None
+            
     @classmethod
     def extract_with_selenium(cls, url: str) -> str:
         """Extracts content using Selenium as a fallback."""
@@ -257,7 +273,14 @@ class WebContentExtractor:
             html_content = cls._driver.page_source
             soup = BeautifulSoup(html_content, 'html.parser')
             main_content = soup.find(['div', 'main', 'article'],
-                                      class_=re.compile(r'content|main-content|post-content', re.IGNORECASE)) or soup.body
+                                      class_=re.compile(
+                    r'\b(content|main-content|post-content|entry-content|article-body|'
+                    r'product-description|the-content|post-entry|entry|sqs-block-content|'
+                    r'content-wrapper|post-body|rich-text-section|postArticle-content|'
+                    r'post-full-content|item-description|message-body|thread-content|'
+                    r'story-content|news-article-body)\b',
+                    re.IGNORECASE
+                )) or soup.body
             main_text = main_content.get_text(separator=' ', strip=True) if main_content else ''
             return re.sub(r'\s+', ' ', main_text)
         except Exception as e:
@@ -271,25 +294,32 @@ class WebContentExtractor:
             cls._driver.quit()
             cls._driver = None  # Reset the driver to None after quitting
             
-    @staticmethod
-    def extract_content(url: str) -> str:
-        """Extracts content from the given URL using requests and BeautifulSoup.
-        Falls back to Selenium if requests fails or returns insufficient content.
-
-        Args:
-            url (str): The URL to extract content from.
-
-        Returns:
-            str: The extracted content, or an empty string if extraction fails. 
-        """
-        if not WebContentExtractor.is_valid_url(url):
+    @classmethod
+    def extract_content(cls, url: str) -> str:
+        """Extracts content, handling dynamic content and fallbacks."""
+        if not cls.is_valid_url(url):
             logger.error(f"Invalid URL: {url}")
             return ""
 
-        for attempt in range(1, WebContentExtractor.MAX_RETRIES + 1):
+        text = cls._extract_with_requests(url)  # Try requests first
+
+        if len(text.strip()) < 200:  
+            logger.warning(f"Insufficient content with requests, trying newspaper for {url}")
+            text = cls._extract_with_newspaper(url)  # Try newspaper
+
+        if len(text.strip()) < 200:
+            logger.warning(f"Insufficient content with newspaper, falling back to Selenium for {url}")
+            text = cls.extract_with_selenium(url)  
+
+        return text
+
+    @classmethod
+    def _extract_with_requests(cls, url: str) -> str:
+        """Extracts content using requests."""
+        for attempt in range(1, cls.MAX_RETRIES + 1):
             try:
                 headers = {
-                    'User-Agent': random.choice(WebContentExtractor.USER_AGENTS),
+                    'User-Agent': random.choice(cls.USER_AGENTS),
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
@@ -298,41 +328,73 @@ class WebContentExtractor:
                     'Cache-Control': 'max-age=0',
                     'DNT': '1',
                 }
-                response = requests.get(url, headers=headers, timeout=WebContentExtractor.TIMEOUT)
+                response = requests.get(url, headers=headers, timeout=cls.TIMEOUT)
                 response.raise_for_status()
                 content_type = response.headers.get('Content-Type', '').lower()
+
                 if 'text/html' not in content_type:
                     logger.warning(f"Non-HTML content returned for {url}: {content_type}")
                     return ""
-
-                # Handle gzip encoding
                 if response.headers.get('content-encoding') == 'gzip':
                     try:
                         html_content = gzip.decompress(response.content).decode('utf-8', errors='ignore')
                     except (OSError, gzip.BadGzipFile) as e:
                         logger.warning(f"Error decoding gzip content: {e}. Using raw content.")
-                        html_content = response.text 
+                        html_content = response.text
                 else:
                     html_content = response.text
 
                 soup = BeautifulSoup(html_content, 'html.parser')
-                text = WebContentExtractor._extract_content_from_soup(soup)
-
-                if len(text.strip()) >= 200:
-                    return text
-                logging.warning(
-                    f"Insufficient content extracted with requests (attempt {attempt}), falling back to Selenium for {url}")
-                return WebContentExtractor.extract_with_selenium(url)
+                return cls._extract_content_from_soup(soup) 
 
             except requests.exceptions.RequestException as e:
-                if attempt < WebContentExtractor.MAX_RETRIES:
-                    logging.warning(f"Error with requests for {url} (attempt {attempt}): {e}. Retrying...")
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                if attempt < cls.MAX_RETRIES:
+                    logger.warning(f"Error with requests for {url} (attempt {attempt}): {e}. Retrying...")
+                    time.sleep(2 ** attempt) 
                 else:
-                    logging.warning(
-                        f"Error with requests for {url} after {WebContentExtractor.MAX_RETRIES} attempts: {e}. Falling back to Selenium.")
-                    return WebContentExtractor.extract_with_selenium(url)
+                    logger.warning(f"Error with requests for {url} after {cls.MAX_RETRIES} attempts: {e}. Giving up.")
+                    return ""  
+
+    @classmethod
+    def _extract_with_newspaper(cls, url: str) -> str:
+        """Extracts content using newspaper3k."""
+        try:
+            article = Article(url)
+            article.download()
+            article.parse()
+            return article.text 
+        except Exception as e:
+            logger.warning(f"Newspaper error for {url}: {e}")
+            return ""
+
+    @classmethod
+    def extract_with_selenium(cls, url: str) -> str:
+        """Extracts content using Selenium (for dynamic content)."""
+        driver = cls.get_driver() 
+        try:
+            driver.get(url)
+            # Wait for the body or a specific element
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            html_content = driver.page_source
+            soup = BeautifulSoup(html_content, 'html.parser')
+            main_content = soup.find(
+                ['div', 'main', 'article'],
+                class_=re.compile(
+                    r'\b(content|main-content|post-content|entry-content|article-body|'
+                    r'product-description|the-content|post-entry|entry|sqs-block-content|'
+                    r'content-wrapper|post-body|rich-text-section|postArticle-content|'
+                    r'post-full-content|item-description|message-body|thread-content|'
+                    r'story-content|news-article-body)\b',
+                    re.IGNORECASE
+                )
+            ) or soup.body
+            main_text = main_content.get_text(separator=' ', strip=True) if main_content else ''
+            return re.sub(r'\s+', ' ', main_text)
+        except Exception as e:
+            logging.error(f"Selenium extraction failed for {url}: {e}")
+            return ""
         
+
     @staticmethod
     def _extract_content_from_soup(soup: BeautifulSoup) -> str:
         """Helper method to extract and clean content from BeautifulSoup object."""

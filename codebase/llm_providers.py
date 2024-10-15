@@ -1,13 +1,7 @@
-from os import system
 import openai  # Assuming OpenAI for now, add others as needed
 from abc import ABC, abstractmethod
 import google.generativeai as genai
 from config import GEMINI_API_KEY, SAFETY_SETTINGS
-import json
-
-
-# genai.GenerativeModel(model_name: str = "gemini-1.5-pro-latest", safety_settings: Any | None = None, generation_config: GenerationConfigType | None = None, tools: FunctionLibraryType | None = None, tool_config: ToolConfigType | None = None, system_instruction: ContentType | None = None) -> GenerativeModel
-
 
 
 class LLMProvider(ABC):
@@ -15,15 +9,6 @@ class LLMProvider(ABC):
     def generate_response(self, prompt, **kwargs):
         pass
 
-
-#load agents from json file and return as dictionary
-def load_agents():
-    with open("agents.json", "r") as f:
-        return json.load(f)
-
-def save_agents(agents):
-    with open("agents.json", "w") as f:
-        json.dump(agents, f, indent=2)
 
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key):
@@ -43,17 +28,8 @@ class OpenAIProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key, **kwargs):
         self.api_key = api_key
-        self.agents = load_agents()
-        default_assistant = "default_assistant"
         genai.configure(api_key=self.api_key)
-        self.client = genai.GenerativeModel(
-            model_name="models/gemini-1.5-pro-latest", 
-            safety_settings=SAFETY_SETTINGS, 
-            generation_config={"temperature": 0.5,},
-            system_instruction=self.agents[default_assistant]
-            tools = agents.default_tools
-            )
-        
+        self.client = genai.GenerativeModel(**kwargs)
 
     def generate_response(self, prompt, **kwargs):
         response = self.client.generate_content(prompt, **kwargs)
