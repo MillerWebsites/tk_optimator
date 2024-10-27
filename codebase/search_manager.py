@@ -208,7 +208,6 @@ class DuckDuckGoSearchProvider(SearchProvider):
         query = re.sub(r'\s+', ' ', query).strip()
         return query[:5000]
 
-
 class WebContentExtractor:
     """Extracts web content from a given URL."""
     MAX_RETRIES = 2
