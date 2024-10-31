@@ -6,7 +6,7 @@ from functools import partial
 import re
 import tools
 from models import ModelManager, ModelFactory, generate_convo_context
-from agents import AgentManager, ToolManager, run_agent_interaction
+from agents import AgentManager, ToolManager
 from search_manager import SearchManager, SearchAPI, DuckDuckGoSearchProvider
 from config import MAX_SEARCH_RESULTS
 import json
@@ -150,6 +150,25 @@ class App(tk.Tk):
         self.edit_menu.add_command(label="Paste", command=self.paste)
 
     def run_workflow(self, event):
+            """
+            Run a workflow based on user input from a prompt.
+
+            This method processes user input to either execute a specified tool with arguments or interact with an AI model. It captures the result or error message and updates the chat history display accordingly.
+
+            Args:
+                self: 
+                event: The event that triggered the workflow execution.
+
+            Returns:
+                None
+
+            Raises:
+                Exception: If an error occurs during tool execution.
+
+            Examples:
+                To execute a tool, the user might input: "tool_name(arg1, arg2)".
+                For regular AI interaction, the user can simply input a question or statement.
+            """
             user_input = self.user_prompt.get()
             self.user_prompt.delete(0, tk.END)
 

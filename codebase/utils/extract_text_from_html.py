@@ -109,7 +109,7 @@ def clean_text(text):
 
 
 # Example usage
-url = 'https://www.theatlantic.com/education/archive/2015/10/complex-academic-writing/412255/'
+url = 'https://www.newsweek.com/tony-hinchcliffe-followers-puerto-rico-trump-1975892'
 extracted_text = extract_text_from_html(url, extract_outside_main=False, extract_comments=False)
 print(extracted_text)
 

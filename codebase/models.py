@@ -46,6 +46,10 @@ class ModelFactory:
         return cls.initialize_model(instruction, **config)
 
 class ModelManager:
+    """
+    Manages the selection of Gemini models based on agent type.
+    """
+    # Mapping of agent types to model names
     MODEL_NAMES = {
         "producer": GEMINI_PRO_MODEL,
         "utility": GEMINI_FLASH_MODEL,
@@ -53,16 +57,34 @@ class ModelManager:
     }
 
     def __init__(self, search_enabled: bool = True, tool_manager: ToolManager = None):
+        """
+        Initializes the ModelManager instance.
+
+        Args:
+            search_enabled: Whether to enable web search for agents. Defaults to True.
+            tool_manager: The ToolManager instance to use for tool execution. Defaults to None.
+        """
         self.search_enabled = search_enabled
         self.tool_manager = tool_manager
 
     def get_model(self, agent_type: str = "producer") -> genai.GenerativeModel:
-        """Selects the appropriate Gemini model based on agent type."""
+        """
+        Selects the appropriate Gemini model based on agent type.
+
+        Args:
+            agent_type: The type of agent to select a model for. Defaults to "producer".
+
+        Raises:
+            ValueError: If the agent type is unknown.
+
+        Returns:
+            A Gemini model instance.
+        """
         if agent_type not in self.MODEL_NAMES:
             raise ValueError(f"Unknown agent type: {agent_type}")
 
         model_name = self.MODEL_NAMES[agent_type]
-        return ModelFactory.create_model(model_name=model_name) # No more instruction here 
+        return ModelFactory.create_model(model_name=model_name)
 
     
     @staticmethod
@@ -84,7 +106,6 @@ class ModelManager:
             user_prompt: str,
             chat_log: List[str],
             context: str,
-            search_manager: SearchManager = None,
         ) -> str:
         try:
             model = self.get_model(agent_type=agent_type)  # Pass agent_type to get_model
@@ -122,4 +143,4 @@ class ModelManager:
             return f"An error occurred while generating the response: {str(e)}"
 
 def generate_convo_context(prompt: str, chat_log: List[str]) -> str:
-    return f"\nLatest Progress: {'\n'.join(chat_log[-10:])}\nTarget final output and or instruction from the user: {prompt}"
+    return f"\nLatest Progress: {'\n'.join(chat_log[-10:])}\nTarget final output or instruction from the user: {prompt}"

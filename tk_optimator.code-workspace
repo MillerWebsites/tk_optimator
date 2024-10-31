@@ -2,6 +2,16 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "codebase"
+		},
+		{
+			"path": "../../createrate"
 		}
-	]
+	],
+	"settings": {
+		"CodeGPT.apiKey": "CodeGPT Plus Beta",
+		"git.ignoreLimitWarning": true
+	}
 }

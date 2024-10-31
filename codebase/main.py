@@ -7,10 +7,38 @@ from config import GEMINI_API_KEY, MAX_SEARCH_RESULTS, LLM_PROVIDER, OPENAI_API_
 from models import ModelManager
 from agents import AgentManager, ToolManager
 import search_manager
-from search_manager import SearchManager, SearchProvider, SearchAPI, DuckDuckGoSearchProvider
+from search_manager import SearchManager, SearchProvider, SearchAPI, DuckDuckGoSearchProvider, initialize_search_manager
 from gui import App
 from llm_providers import OpenAIProvider, GeminiProvider  # Import GeminiProvider
 import tools  # Import the tools module
+
+import json
+from agents import Agent, ToolManager
+from models import ModelManager
+
+# Load the researcher agent's configuration from the agents.json file
+with open('agents.json', encoding='utf-8', errors='ignore') as f:
+    agents_config = json.load(f)
+researcher_config = agents_config['researcher']
+
+# Create an instance of the ModelManager class
+model_manager = ModelManager()
+
+# Create an instance of the ToolManager class
+tool_manager = ToolManager()
+
+# Create an instance of the Agent class
+researcher_agent = Agent(
+    agent_type=researcher_config['agent_type'],
+    model_manager=model_manager,
+    tool_manager=tool_manager,
+    instruction=researcher_config['system_prompt'],
+    tools=[],  # The researcher agent doesn't have any tools
+    model_config=researcher_config['generation_config']
+)
+
+
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -19,24 +47,12 @@ logger = logging.getLogger(__name__)
 
 class AIAssistantApp:
     def __init__(self):
-        self.search_manager = SearchManager(
-            [
-                SearchAPI(
-                    "Google",
-                    "YOUR_GOOGLE_CUSTOM_SEARCH_API_KEY",
-                    "https://www.googleapis.com/customsearch/v1",
-                    {"cx": "YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID"},
-                    100,
-                    "items",
-                    1,
-                )
-            ],
-            duckduckgo_provider=DuckDuckGoSearchProvider(),
-        )
+        self.search_manager = initialize_search_manager()
         self.tool_manager = ToolManager()
         # Register the search_manager instance as a tool
-        self.tool_manager.register_tool("web_search", self.search_manager.search)  
+        self.tool_manager.register_tool("search", partial(tools.web_search, self.search_manager))
         self.tool_manager.register_tool("foia_search", tools.foia_search)
+        self.tool_manager.register_tool("fetch_recent_arxiv_papers_by_topic", tools.FetchRecentArxivPapersbyTopic())
         self.model_manager = ModelManager(search_enabled=True, tool_manager=self.tool_manager)
         self.agent_manager = AgentManager(self.tool_manager)
         self.llm_provider = self._initialize_llm_provider()

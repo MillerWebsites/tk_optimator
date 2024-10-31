@@ -1,0 +1,1 @@
+from cr8r8r import generate

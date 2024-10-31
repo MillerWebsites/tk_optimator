@@ -3,9 +3,10 @@ import requests
 from bs4 import BeautifulSoup
 import html2text
 import random
+import utils
 
 from search_manager import WebContentExtractor, SearchManager  # Import SearchManager
-
+from agent_tools import fetch_latest_arxiv_papers
 
 def foia_search(query: str) -> str:
     """Searches FOIA.gov for the given query and returns the text content.
@@ -39,7 +40,7 @@ def foia_search(query: str) -> str:
     return html2text.html2text(html_content)
 
 
-def web_search(search_manager: SearchManager, query: str, num_results: int = 3) -> str:
+def web_search(search_manager: SearchManager, query: str, num_results: int = 10) -> str:
     """Performs a web search using the provided SearchManager.
 
     Args:
@@ -53,7 +54,15 @@ def web_search(search_manager: SearchManager, query: str, num_results: int = 3) 
     results = search_manager.search(query, num_results)
     return "\n\n".join(
         [
-            f"**{result['title']}** ({result['url']})\n{result['snippet']}\n{result['content'][:500]}"
+            f"**{result['title']}** ({result['url']})\n{result['snippet']}\n{result['content'][:50000]}"
             for result in results
         ]
     )
+
+class FetchRecentArxivPapersbyTopic:
+    def __init__(self):
+        pass
+
+    def execute(self, topic):
+        papers = fetch_latest_arxiv_papers(topic)
+        return "\n\n".join([f"Title: {paper['title']}\nAuthors: {', '.join(paper['authors'])}\nPublished: {paper['published']}\nSummary: {paper['summary']}\nLink: {paper['link']}\n" for paper in papers])

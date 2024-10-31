@@ -24,6 +24,9 @@ from selenium.webdriver.support import expected_conditions as EC
 import gzip
 #$end
 from newspaper import Article
+from functools import lru_cache
+from datetime import datetime, timedelta
+
 
 def fetch_article_text(url):
     article = Article(url)
@@ -208,6 +211,7 @@ class DuckDuckGoSearchProvider(SearchProvider):
         query = re.sub(r'\s+', ' ', query).strip()
         return query[:5000]
 
+
 class WebContentExtractor:
     """Extracts web content from a given URL."""
     MAX_RETRIES = 2
@@ -289,29 +293,23 @@ class WebContentExtractor:
     @classmethod
     def quit_driver(cls):
         """Quits the WebDriver if it is running."""
-        if cls._driver is not None:
-            cls._driver.quit()
-            cls._driver = None  # Reset the driver to None after quitting
-            
+        if cls._driver is None:
+            return
+        cls._driver.quit()
+        cls._driver = None  # Reset the driver to None after quitting
+        
     @classmethod
     def extract_content(cls, url: str) -> str:
         """Extracts content, handling dynamic content and fallbacks."""
         if not cls.is_valid_url(url):
             logger.error(f"Invalid URL: {url}")
             return ""
-
-        text = cls._extract_with_requests(url)  # Try requests first
-
-        if len(text.strip()) < 200:  
-            logger.warning(f"Insufficient content with requests, trying newspaper for {url}")
-            text = cls._extract_with_newspaper(url)  # Try newspaper
-
-        if len(text.strip()) < 200:
-            logger.warning(f"Insufficient content with newspaper, falling back to Selenium for {url}")
-            text = cls.extract_with_selenium(url)  
-
-        return text
-
+        for extractor in [cls._extract_with_requests, cls._extract_with_newspaper, cls.extract_with_selenium]:
+            text = extractor(url)
+            if len(text.strip()) >= 200:
+                return text
+        return ""
+    
     @classmethod
     def _extract_with_requests(cls, url: str) -> str:
         """Extracts content using requests."""
@@ -465,34 +463,43 @@ class WebContentExtractor:
         except ValueError:
             return False
 
-class SearchManager:
-    """Manages searches across multiple APIs and providers."""
 
-    def __init__(self, apis: List[SearchAPI], web_search_provider: SearchProvider, max_content_length: int = 10000,
-                 cache_size: int = 100):
+class SearchManager:
+    """Manages searches across multiple APIs and providers with enhanced caching."""
+
+    def __init__(self, apis: List[SearchAPI], web_search_provider: SearchProvider, 
+                 max_content_length: int = 10000, cache_size: int = 100, cache_ttl: int = 3600):
         self.apis = apis
         self.web_search_provider = web_search_provider
         self.content_extractor = WebContentExtractor()
         self.max_content_length = max_content_length
         self.cache = {}
+        self.cache_timestamps = {}
         self.cache_size = cache_size
+        self.cache_ttl = cache_ttl
 
-    def search(self, query: str, num_results: int = 5):
+    def search(self, query: str, num_results: int = 10) -> List[Dict]:
         """
-        Performs a search using available APIs and the web search provider.
-
+        Performs a cached search using available APIs and the web search provider.
+        
         Args:
             query (str): The search query.
-            num_results (int, optional): The maximum number of results to return. 
-                                          Defaults to 5.
-
+            num_results (int): The maximum number of results to return.
+            
         Returns:
-            List[Dict]: A list of dictionaries, each representing a search result 
-                        with 'title', 'url', 'snippet', and 'content' keys. 
+            List[Dict]: A list of search results with metadata.
         """
-        # Define the order of APIs to try
-        api_order = ["Google", "Brave", "DuckDuckGo"]
+        # Check cache first
+        cache_key = f"{query}:{num_results}"
+        if cache_key in self.cache:
+            timestamp = self.cache_timestamps.get(cache_key)
+            if timestamp and (datetime.now() - timestamp) < timedelta(seconds=self.cache_ttl):
+                logger.info(f"Returning cached results for query: {query}")
+                return self.cache[cache_key]
 
+        # If not in cache or expired, perform new search
+        api_order = ["Google", "Brave", "DuckDuckGo"]
+        
         # Try each API in order
         for api_name in api_order:
             api = next((api for api in self.apis if api.name == api_name), None)
@@ -500,27 +507,23 @@ class SearchManager:
                 try:
                     logging.info(f"Trying {api_name} for query: {query}")
                     if search_results := api.search(query, num_results):
-                        # Process the results and return
-                        detailed_results = []
-                        for result in search_results:
-                            content = self.content_extractor.extract_content(result.url)
-                            result.content = content[:self.max_content_length]
-                            detailed_results.append({
-                                'title': result.title,
-                                'url': result.url,
-                                'snippet': result.snippet,
-                                'content': result.content
-                            })
-                        self._cache_results(query, detailed_results)
+                        detailed_results = self._process_search_results(search_results)
+                        self._cache_results(cache_key, detailed_results)
                         return detailed_results
                 except Exception as e:
                     logging.error(f"Error searching {api_name}: {e}")
 
-        # If all APIs fail, try DuckDuckGo as a last resort
+        # Fallback to DuckDuckGo
         logging.info(f"Trying DuckDuckGo for query: {query}")
         duck_results = self.web_search_provider.search(query, num_results)
+        detailed_results = self._process_search_results(duck_results)
+        self._cache_results(cache_key, detailed_results)
+        return detailed_results
+
+    def _process_search_results(self, search_results: List[SearchResult]) -> List[Dict]:
+        """Process search results and extract content."""
         detailed_results = []
-        for result in duck_results:
+        for result in search_results:
             content = self.content_extractor.extract_content(result.url)
             detailed_results.append({
                 'title': result.title,
@@ -528,14 +531,30 @@ class SearchManager:
                 'snippet': result.snippet,
                 'content': content[:self.max_content_length] if content is not None else ""
             })
-        self._cache_results(query, detailed_results)
         return detailed_results
 
-    def _cache_results(self, query: str, results: List[Dict]):
-        """Caches the search results."""
-        self.cache[query] = results
-        if len(self.cache) > self.cache_size:
-            self.cache.pop(next(iter(self.cache)))  
+    def _cache_results(self, cache_key: str, results: List[Dict]):
+        """Cache search results with timestamp."""
+        self.cache[cache_key] = results
+        self.cache_timestamps[cache_key] = datetime.now()
+        
+        # Remove oldest entries if cache is full
+        while len(self.cache) > self.cache_size:
+            oldest_key = min(self.cache_timestamps.items(), key=lambda x: x[1])[0]
+            del self.cache[oldest_key]
+            del self.cache_timestamps[oldest_key]
+
+    def clear_expired_cache(self):
+        """Clear expired cache entries."""
+        current_time = datetime.now()
+        expired_keys = [
+            key for key, timestamp in self.cache_timestamps.items()
+            if (current_time - timestamp).total_seconds() > self.cache_ttl
+        ]
+        for key in expired_keys:
+            del self.cache[key]
+            del self.cache_timestamps[key]
+
 
 
 def initialize_search_manager():
@@ -593,11 +612,12 @@ def foia_search(query: str) -> List[str]:
         logger.error(f"Error searching FOIA.gov: {e}")
         return []
 
+num_results = 10
 
 # Example usage
 if __name__ == "__main__":
     search_manager = initialize_search_manager()
-    query = "specific ideation templates and frameworks"
+    query = ""
     num_results = 15
 
     if search_manager:
